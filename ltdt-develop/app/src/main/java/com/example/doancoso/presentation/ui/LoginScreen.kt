@@ -37,7 +37,10 @@ fun LoginScreen(navController: NavHostController,authService : AuthService ,) {
 
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var coroutineScope = rememberCoroutineScope()
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    val coroutineScope = rememberCoroutineScope()
+    val snackbarHostState = remember { SnackbarHostState() }
     // LaunchedEffect để xử lý logic điều hướng một lần
 //    LaunchedEffect(authState) {
 //        when (authState) {
@@ -52,14 +55,17 @@ fun LoginScreen(navController: NavHostController,authService : AuthService ,) {
 //            else -> {}
 //        }
 //    }
-
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF1E2A44))
-            .padding(bottom = 50.dp), // Chừa khoảng cách 64.dp từ đáy
-        contentAlignment = Alignment.BottomCenter
-    ) {
+    Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+    ) { paddingValues ->
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF1E2A44))
+                .padding(paddingValues)
+                .padding(bottom = 50.dp),
+            contentAlignment = Alignment.BottomCenter
+        ) {
 //        when (authState) {
 //            is AuthState.Loading -> CircularProgressIndicator()
 //            is AuthState.Error -> {
@@ -68,115 +74,157 @@ fun LoginScreen(navController: NavHostController,authService : AuthService ,) {
 //            }
 //            else -> {
 
-        // Thêm hình ảnh biểu đồ tài chính
-        Image(
-            painter = painterResource(id = R.drawable.financial_chart),
-            contentDescription = "Financial Chart",
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(300.dp)
-                .align(Alignment.TopCenter) // Đặt hình ảnh ở trên cùng
-        )
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .wrapContentHeight()
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.White)
-                .padding(16.dp)
-        ) {
-            Column(
+            // Thêm hình ảnh biểu đồ tài chính
+            Image(
+                painter = painterResource(id = R.drawable.financial_chart),
+                contentDescription = "Financial Chart",
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally
+                    .height(200.dp)
+                    .align(Alignment.TopCenter) // Đặt hình ảnh ở trên cùng
+            )
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .wrapContentHeight()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White)
+                    .padding(16.dp)
             ) {
-                OutlinedTextField(
-                    value = email,
-                    onValueChange = { email = it },
-                    label = { Text("Email") },
-                    trailingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Email,
-                            contentDescription = "Person Icon"
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = TextFieldDefaults.outlinedTextFieldColors(
-                        unfocusedBorderColor = Color.Black  // Màu viền khi không focus
-                    )
-
-                )
-                Spacer(modifier = Modifier.height(8.dp))
-                OutlinedTextField(
-                    value = password,
-                    onValueChange = { password = it },
-                    label = { Text("Password") },
-                    visualTransformation = PasswordVisualTransformation(),
-                    trailingIcon = {
-                        Icon(
-                            imageVector = Icons.Default.Lock,
-                            contentDescription = "Person Icon"
-                        )
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = TextFieldDefaults.outlinedTextFieldColors(
-                        unfocusedBorderColor = Color.Black
-                    )
-                )
-                Spacer(modifier = Modifier.height(16.dp))
-//                    Button(
-//                        onClick = { viewModel.loginUser(email, password) },
-//                        modifier = Modifier.fillMaxWidth()
-//                    ) {
-                Button(
-                    onClick = {
-                        // Xử lý tạm thời khi nhấn nút, ví dụ in ra log
-                        coroutineScope.launch {
-                            val success = authService.login(email, password)
-//                            isLoading = false
-                            if (success) {
-                                navController.navigate("home")
-                            } else {
-                              println("error")
-                            }
-                        }
-                        println("Login clicked: Email=$email, Password=$password")
-                    },
+                Column(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(top = 24.dp),
-                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007BFF)) // Màu xanh
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("Login")
-                }
-                Spacer(modifier = Modifier.height(8.dp))
-                TextButton(onClick = { navController.navigate("signup") }) {
-                    Column(
-                        modifier = Modifier,
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Text("Don't have an account? Sign up", color = Color.Gray)
-                        Text("Google Sign In", color = Color.Gray)
+                    // Hiển thị thông báo lỗi nếu có
+                    errorMessage?.let { error ->
+                        Text(
+                            text = error,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
                     }
-                }
-                Button(
-                    onClick = {},
-                    modifier = Modifier.size(76.dp),
-                    shape = CircleShape,
-                    colors = ButtonDefaults.buttonColors(containerColor = Color.White)
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.gg),
-                        contentDescription = "Google Sign In",
-                        modifier = Modifier.size(50.dp)
+
+                    OutlinedTextField(
+                        value = email,
+                        onValueChange = {
+                            email = it
+                            errorMessage = null // Xóa lỗi khi người dùng bắt đầu nhập lại
+                        },
+                        label = { Text("Email") },
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Email,
+                                contentDescription = "Email Icon"
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = TextFieldDefaults.outlinedTextFieldColors(
+                            unfocusedBorderColor = Color.Black,
+                            focusedBorderColor = Color.Black
+                        ),
+                        isError = errorMessage != null
                     )
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    OutlinedTextField(
+                        value = password,
+                        onValueChange = {
+                            password = it
+                            errorMessage = null // Xóa lỗi khi người dùng bắt đầu nhập lại
+                        },
+                        label = { Text("Password") },
+                        visualTransformation = PasswordVisualTransformation(),
+                        trailingIcon = {
+                            Icon(
+                                imageVector = Icons.Default.Lock,
+                                contentDescription = "Lock Icon"
+                            )
+                        },
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = TextFieldDefaults.outlinedTextFieldColors(
+                            unfocusedBorderColor = Color.Black,
+                            focusedBorderColor = Color.Black
+                        ),
+                        isError = errorMessage != null
+                    )
+
+                    Spacer(modifier = Modifier.height(16.dp))
+
+                    Button(
+                        onClick = {
+                            coroutineScope.launch {
+                                // Kiểm tra cơ bản trước khi gọi API
+                                if (email.isBlank() || password.isBlank()) {
+                                    errorMessage = "Please fill in both email and password"
+                                    return@launch
+                                }
+
+                                isLoading = true
+                                val success = authService.login(email, password)
+                                isLoading = false
+
+                                if (success) {
+                                    navController.navigate("home") {
+                                        popUpTo("login") { inclusive = true }
+                                    }
+                                } else {
+                                    errorMessage = "Invalid email or password"
+                                    snackbarHostState.showSnackbar("Invalid email or password")
+                                }
+                            }
+                        },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(top = 24.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007BFF)),
+                        enabled = !isLoading
+                    ) {
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = Color.White
+                            )
+                        } else {
+                            Text("Login", modifier = Modifier.padding(8.dp))
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+
+                    TextButton(onClick = { navController.navigate("signup") }) {
+                        Column(
+                            modifier = Modifier,
+                            horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Text("Don't have an account? Sign up", color = Color.Gray)
+                            Text("Google Sign In", color = Color.Gray)
+                        }
+                    }
+
+                    Button(
+                        onClick = {},
+                        modifier = Modifier
+                            .size(76.dp)
+                            .padding(top = 8.dp),
+                        shape = CircleShape,
+                        colors = ButtonDefaults.buttonColors(containerColor = Color.White),
+                        border = BorderStroke(1.dp, Color.Gray)
+                    ) {
+                        Image(
+                            painter = painterResource(id = R.drawable.gg),
+                            contentDescription = "Google Sign In",
+                            modifier = Modifier.size(50.dp)
+                        )
+                    }
                 }
             }
         }
     }
 }
-
 //    }
 //}
 

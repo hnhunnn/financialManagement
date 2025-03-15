@@ -26,16 +26,24 @@ import androidx.navigation.compose.rememberNavController
 import com.example.doancoso.R
 import com.example.doancoso.data.repository.AuthService
 import kotlinx.coroutines.launch
+import java.util.regex.Pattern
 
 @Composable
 fun SignupScreen(navController: NavHostController, authService: AuthService) {
 //    val viewModel: AuthViewModel = viewModel()
 //    val authState by viewModel.authState.collectAsState()
     val coroutineScope = rememberCoroutineScope()
+    var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
-    var name by remember { mutableStateOf("") }
-    var messageError by remember { mutableStateOf(false) }
+    var errorMessage by remember { mutableStateOf<String?>(null) }
+    var isLoading by remember { mutableStateOf(false) }
+    val snackbarHostState = remember { SnackbarHostState() }
+
+    // Biểu thức chính quy để kiểm tra cú pháp email
+    val emailPattern = Pattern.compile(
+        "[a-zA-Z0-9._-]+@[a-z]+\\.+[a-z]+"
+    )
 
     // LaunchedEffect để xử lý điều hướng một lần
 //    LaunchedEffect(authState) {
@@ -50,33 +58,36 @@ fun SignupScreen(navController: NavHostController, authService: AuthService) {
 //            else -> {}
 //        }
 //    }
-
+    Scaffold(
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+    ) { paddingValues ->
     //    sử dụng box để chồng các layer ( nen và form )
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color(0xFF1E2A44))
-            .padding(bottom = 50.dp), // Chừa khoảng cách 64.dp từ đáy
-        contentAlignment = Alignment.BottomCenter
-    ) {
+        Box(
+            modifier = Modifier
+                .fillMaxSize()
+                .background(Color(0xFF1E2A44))
+                .padding(paddingValues)
+                .padding(bottom = 50.dp),
+            contentAlignment = Alignment.BottomCenter
+        ) {
         // Thêm hình ảnh biểu đồ tài chính
         Image(
             painter = painterResource(id = R.drawable.financial_chart),
             contentDescription = "Financial Chart",
             modifier = Modifier
                 .fillMaxWidth()
-                .height(300.dp)
+                .height(200.dp)
                 .align(Alignment.TopCenter) // Đặt hình ảnh ở trên cùng
         )
     //    form ky nằm giữa
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.9f)
-                .wrapContentHeight()
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.White)
-                .padding(16.dp)
-        ){
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .wrapContentHeight()
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White)
+                    .padding(16.dp)
+            ) {
 //        when (authState) {
 //            is AuthState.Loading -> CircularProgressIndicator()
 //            is AuthState.Error -> {
@@ -90,7 +101,17 @@ fun SignupScreen(navController: NavHostController, authService: AuthService) {
                         .padding(16.dp),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    // trươờng nhập ten với icon
+                    // Hiển thị thông báo lỗi nếu có
+                    errorMessage?.let { error ->
+                        Text(
+                            text = error,
+                            color = MaterialTheme.colorScheme.error,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(bottom = 16.dp)
+                        )
+                    }
+
+                    // Trường nhập tên
                     OutlinedTextField(
                         value = name,
                         onValueChange = { name = it },
@@ -101,17 +122,21 @@ fun SignupScreen(navController: NavHostController, authService: AuthService) {
                                 contentDescription = "Person Icon"
                             )
                         },
-
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 8.dp)
-
+                            .padding(top = 8.dp),
+                        isError = errorMessage != null && name.isBlank()
                     )
+
                     Spacer(modifier = Modifier.height(8.dp))
-                    // nhap mail
+
+                    // Trường nhập email
                     OutlinedTextField(
                         value = email,
-                        onValueChange = { email = it },
+                        onValueChange = {
+                            email = it
+                            errorMessage = null // Xóa lỗi khi người dùng bắt đầu nhập lại
+                        },
                         label = { Text("Email") },
                         trailingIcon = {
                             Icon(
@@ -121,13 +146,19 @@ fun SignupScreen(navController: NavHostController, authService: AuthService) {
                         },
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 8.dp)
+                            .padding(top = 8.dp),
+                        isError = errorMessage != null
                     )
+
                     Spacer(modifier = Modifier.height(8.dp))
-                    // pass
+
+                    // Trường nhập mật khẩu
                     OutlinedTextField(
                         value = password,
-                        onValueChange = { password = it },
+                        onValueChange = {
+                            password = it
+                            errorMessage = null // Xóa lỗi khi người dùng bắt đầu nhập lại
+                        },
                         label = { Text("Password") },
                         trailingIcon = {
                             Icon(
@@ -138,48 +169,69 @@ fun SignupScreen(navController: NavHostController, authService: AuthService) {
                         visualTransformation = PasswordVisualTransformation(),
                         modifier = Modifier
                             .fillMaxWidth()
-                            .padding(top = 8.dp)
+                            .padding(top = 8.dp),
+                        isError = errorMessage != null && password.isBlank()
                     )
+
                     Spacer(modifier = Modifier.height(16.dp))
-//                    Button(
-//                        onClick = { viewModel.registerUser(email, password, name) },
-//                        modifier = Modifier.fillMaxWidth()
-//                    ) {
-                    // nút đk
-                    if(messageError){
-                        Text("Please enter vorrect amail syntax ! ")
-                    }
+
                     Button(
                         onClick = {
-                            // Xử lý tạm thời khi nhấn nút, ví dụ in ra log
-
                             coroutineScope.launch {
-                                val success = authService.register(name,email, password)
-//                            isLoading = false
-                                if (success) {
-                                    navController.navigate("login")
-                                } else {
-                                    messageError=true
+                                // Kiểm tra các trường
+                                if (name.isBlank() || email.isBlank() || password.isBlank()) {
+                                    errorMessage = "Please fill in all fields"
+                                    return@launch
+                                }
 
+                                if (!emailPattern.matcher(email).matches()) {
+                                    errorMessage = "Please enter a valid email address"
+                                    return@launch
+                                }
+
+                                if (password.length < 6) {
+                                    errorMessage = "Password must be at least 6 characters"
+                                    return@launch
+                                }
+
+                                isLoading = true
+                                val success = authService.register(name, email, password)
+                                isLoading = false
+
+                                if (success) {
+                                    navController.navigate("login") {
+                                        popUpTo("signup") { inclusive = true }
+                                    }
+                                    Toast.makeText(navController.context, "Registration successful!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    errorMessage = "Registration failed. Please try again."
+                                    snackbarHostState.showSnackbar("Registration failed. Please try again.")
                                 }
                             }
-                            println("Sign Up clicked: Name=$name, Email=$email, Password=$password")
                         },
                         modifier = Modifier
                             .fillMaxWidth()
                             .padding(top = 24.dp),
-                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007BFF)) // Màu xanh
+                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF007BFF)),
+                        enabled = !isLoading
                     ) {
-                        Text("Sign Up", color = Color.White)
+                        if (isLoading) {
+                            CircularProgressIndicator(
+                                modifier = Modifier.size(24.dp),
+                                color = Color.White
+                            )
+                        } else {
+                            Text("Sign Up", color = Color.White)
+                        }
                     }
+
                     Spacer(modifier = Modifier.height(8.dp))
+
                     TextButton(onClick = { navController.navigate("login") }) {
                         Text("Already have an account? Login", color = Color.Gray)
                     }
                 }
-              }
-           }
+            }
         }
-//    }
-//}
-
+    }
+}
